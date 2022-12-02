@@ -28,13 +28,19 @@ def get_nli(sentence):
 def do_consensus(docs_score):
     counters=Counter(docs_score)
     most_common=counters.most_common()
-    if most_common[0][0]=='neutral':
-        if most_common[1][0]=='entailment':
-            return 1
+    if len(most_common)>1:
+        if most_common[0][0]=='neutral':
+            if most_common[1][0]=='entailment':
+                return 1
+            else:
+                return 0
         else:
-            return 0
+            if most_common[0][0] == 'entailment':
+                return 1
+            else:
+                return 0
     else:
-        if most_common[0][0] == 'entailment':
+        if most_common[0][0]=='entailment':
             return 1
         else:
             return 0
@@ -51,19 +57,20 @@ for qid in qids:
     docnos=list(set(docnos))
     for docno in docnos:
         docs_specific=qid_simi_score.loc[qid_simi_score['docno']==docno]
-        docs_score = []
         journs_index=np.unique(docs_specific.j_docno.values,return_index=True)[1]
         journs=[docs_specific.j_docno.values[j_index] for j_index in sorted(journs_index)]
-        for jour in journs[:10]:
-            jours_specifics=docs_specific.loc[docs_specific['j_docno']==jour]
+        journal_consensus=[]
+        for jour in journs[:5]:
+            docs_score = []
+            jours_specifics=docs_specific.loc[docs_specific['j_docno']==jour].drop_duplicates().sort_index().head(10)
             for ii,rows in jours_specifics.iterrows():
                 sentences=ast.literal_eval(rows['scores'])
                 #sentences=rows['scores']
                 if len(sentences)>0:
-                    for sentence in sentences:
+                    for sentence in sentences[:5]:
                         docs_score.append(get_nli(sentence))
-
-        cred_score.append([qid,docno,do_consensus(docs_score)])
+            journal_consensus.append(do_consensus(docs_score))
+        cred_score.append([qid,docno,Counter(journal_consensus).most_common()[0][0]])
 
 
 
