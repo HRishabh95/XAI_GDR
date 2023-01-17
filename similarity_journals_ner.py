@@ -3,8 +3,14 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 model = SentenceTransformer('pritamdeka/S-Biomed-Roberta-snli-multinli-stsb')
 import numpy as np
-from nltk.tokenize import sent_tokenize
 #Encoding: bert-base-nli-mean-tokens
+from transformers import pipeline
+from difflib import SequenceMatcher
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+ner_model='d4data/biomedical-ner-all'
+tokenizer = AutoTokenizer.from_pretrained(ner_model)
+model_ner = AutoModelForTokenClassification.from_pretrained(ner_model)
+pipe = pipeline("ner", model=model_ner, tokenizer=tokenizer, aggregation_strategy="simple") # pass device=0 if using gpu
 
 import errno
 import os
@@ -41,80 +47,27 @@ def clean_en_text(text):
   text = remove_whitespaces(text)
   return text.strip().lower()
 
-#
-# def get_vectors(dfs,window=20):
-#     vecs = []
-#     for ii, rows in dfs.iterrows():
-#         chuck_vecs = []
-#         texts = clean_en_text(rows['text'])
-#         simis=[]
-#         for i in range(0, len(texts.split()), 512-window):
-#             texts_512 = " ".join(texts.split()[i:i + 512-window])
-#             sen_embeddings = model.encode(texts_512)
-#             query_embeddings = model.encode(rows['query'])
-#             simi=cosine_similarity([query_embeddings,sen_embeddings])[0][1]
-#             simis.append(simi)
-#             chuck_vecs.append(sen_embeddings*simi)
-#         vecs.append(np.mean(chuck_vecs, axis=0))
-#     dfs['vectors'] = vecs
-#     return dfs
+def get_entity_name(entities):
+    if len(entities)>0:
+        return_word=[]
+        for entity in entities:
+            if entity['entity_group']=='Medication':
+                if entity['word'] not in return_word:
+                    return_word.append(entity['word'])
+        if len(return_word)>0:
+
+            return return_word[0]
+        else:
+            return None
+    else:
+        return None
+
+def get_medication_query(texts):
+    texts=texts.replace('covid 19','')
+    texts=" ".join(texts.split(" ")[:-2])
+    return texts
 
 
-# def get_vectors(dfs):
-#     vecs = []
-#     for ii, rows in dfs.iterrows():
-#         chuck_vecs = []
-#         texts = clean_en_text(rows['text'])
-#         simis=[]
-#         texts=texts.split('.')
-#         for i in range(0, len(texts)):
-#             sen_embeddings = model.encode(texts[i])
-#             query_embeddings = model.encode(rows['query'])
-#             simi=cosine_similarity([query_embeddings,sen_embeddings])[0][1]
-#             simis.append([texts[i],simi])
-#             chuck_vecs.append(sen_embeddings*simi)
-#         vecs.append(np.mean(chuck_vecs, axis=0))
-#     dfs['vectors'] = vecs
-#     return dfs
-
-
-
-import re
-alphabets= "([A-Za-z])"
-prefixes = "(Mr|St|Mrs|Ms|Dr)[.]"
-suffixes = "(Inc|Ltd|Jr|Sr|Co)"
-starters = "(Mr|Mrs|Ms|Dr|He\s|She\s|It\s|They\s|Their\s|Our\s|We\s|But\s|However\s|That\s|This\s|Wherever)"
-acronyms = "([A-Z][.][A-Z][.](?:[A-Z][.])?)"
-websites = "[.](com|net|org|io|gov)"
-digits = "([0-9])"
-
-def split_into_sentences(text):
-    text = " " + text + "  "
-    text = text.replace("\n"," ")
-    text = re.sub(prefixes,"\\1<prd>",text)
-    text = re.sub(websites,"<prd>\\1",text)
-    text = re.sub(digits + "[.]" + digits,"\\1<prd>\\2",text)
-    if "..." in text: text = text.replace("...","<prd><prd><prd>")
-    if "Ph.D" in text: text = text.replace("Ph.D.","Ph<prd>D<prd>")
-    text = re.sub("\s" + alphabets + "[.] "," \\1<prd> ",text)
-    text = re.sub(acronyms+" "+starters,"\\1<stop> \\2",text)
-    text = re.sub(alphabets + "[.]" + alphabets + "[.]" + alphabets + "[.]","\\1<prd>\\2<prd>\\3<prd>",text)
-    text = re.sub(alphabets + "[.]" + alphabets + "[.]","\\1<prd>\\2<prd>",text)
-    text = re.sub(" "+suffixes+"[.] "+starters," \\1<stop> \\2",text)
-    text = re.sub(" "+suffixes+"[.]"," \\1<prd>",text)
-    text = re.sub(" " + alphabets + "[.]"," \\1<prd>",text)
-    if "”" in text: text = text.replace(".”","”.")
-    if "\"" in text: text = text.replace(".\"","\".")
-    if "!" in text: text = text.replace("!\"","\"!")
-    if "?" in text: text = text.replace("?\"","\"?")
-    text = text.replace(".",".<stop>")
-    text = text.replace("?","?<stop>")
-    text = text.replace("!","!<stop>")
-    text = text.replace("<prd>",".")
-    sentences = text.split("<stop>")
-    sentences = sentences[:-1]
-    sentences = [s.strip() for s in sentences]
-    return sentences
 
 def get_score_n(journal_dfs,docs_dfs,root_path,top_n=10,d_top=100):
     qids = np.unique(docs_dfs.qid.values)
@@ -129,16 +82,25 @@ def get_score_n(journal_dfs,docs_dfs,root_path,top_n=10,d_top=100):
             for doc_sen in doc_sens_sorted:
                 sens_evi=''
                 if doc_sen[-1]>0.4:
+                    docs_sen_entity_name = get_entity_name(pipe(doc_sen[0]))
                     doc_sen_vec = model.encode(doc_sen[0])
                     for jj, journal_rows in journal_tops.iterrows():
-                        texts = split_into_sentences(journal_rows['text'])
+                        texts = journal_rows['text'].split('.')
                         for sen in texts:
                             if len(sen.split(" "))>5:
                                 jou_sen_vec=model.encode(sen)
                                 simi = cosine_similarity([doc_sen_vec, jou_sen_vec])[0][1]
-
-                                if simi>0.0:
-                                    sens_evi+='%s\t %s\t %s,'%(doc_sen[0],sen,simi)
+                                journal_sen_entity_name = get_entity_name(pipe(sen))
+                                if docs_sen_entity_name and journal_sen_entity_name:
+                                    if docs_sen_entity_name == journal_sen_entity_name:
+                                        sens_evi += '%s\t %s\t %s,'%(doc_sen[0],sen,simi)
+                                    elif SequenceMatcher(None, docs_sen_entity_name,
+                                                         journal_sen_entity_name).ratio() > 0.9:
+                                        sens_evi += '%s\t %s\t %s,'%(doc_sen[0],sen,float(simi)*0.3)
+                                    else:
+                                        sens_evi += '%s\t %s\t %s,'%(doc_sen[0],sen,float(simi)*0.15)
+                                else:
+                                    sens_evi += '%s\t %s\t %s,' % (doc_sen[0], sen, float(simi) * 0.05)
                         journal_evi_sorted = sorted([('%s\t %s' % (i.split('\t')[0], i.split('\t')[1]), float(i.split('\t')[-1])) for i
                                         in sens_evi.split(",") if len(i) > 0], key=lambda t:t[1],reverse=True)[:10]
 
@@ -147,14 +109,14 @@ def get_score_n(journal_dfs,docs_dfs,root_path,top_n=10,d_top=100):
     similarity_df = pd.DataFrame(similarity, columns=['qid', 'docno', 'j_docno', 'scores','rank'])
     similarity_path=f'''{root_path}/experiments/dtop{d_top}_jtop{top_n}'''
     mkdir_p(similarity_path)
-    similarity_df.to_csv('%s/gen_ner_func_manual_sens_similarity_score_sw_biobert.csv'%similarity_path, index=None, sep='\t')
+    similarity_df.to_csv('%s/ner_manual_both_sens_similarity_score_sw_biobert.csv'%similarity_path, index=None, sep='\t')
     return similarity_df
 
 #load dfs
 root_path='/tmp/pycharm_project_631/'
 journal_dfs=pd.read_csv("%s/docs/journal_wnum_top_30.csv"%root_path,sep='\t')
 #docs_dfs=pd.read_csv("%s/docs/docs_all_top_sen_ner.csv"%root_path,sep=';')
-docs_dfs=pd.read_csv("%s/docs/gen_docs_func_all_top_sen_ner_manual.csv"%root_path,sep=';')
+docs_dfs=pd.read_csv("%s/docs/docs_all_top_sen_ner_manual.csv"%root_path,sep=';')
 
 #
 #docs_dfs_1=docs_dfs[docs_dfs['qid']==1]
@@ -250,5 +212,5 @@ simi_score=get_score_n(journal_dfs,docs_dfs,root_path)
 #
 # from sklearn.metrics import roc_auc_score
 # print(roc_auc_score(inner['cred_x'],inner['cred_y']))
-#
+
 ##

@@ -9,6 +9,7 @@ from collections import Counter
 
 # simi_score=pd.read_csv('./experiments/dtop100_jtop10/Bm25_sens_similarity_score_sw_biobert.csv',sep='\t')
 simi_score=pd.read_csv('./experiments/dtop100_jtop10/ner_manual_sens_similarity_score_sw_biobert.csv',sep='\t')
+#simi_score=pd.read_csv('./experiments/dtop100_jtop10/ner_manual_both_sens_similarity_score_sw_biobert.csv',sep='\t')
 #
 
 def get_nli(sentence):
@@ -130,4 +131,50 @@ print(fowlkes_mallows_score(inner['cred_x'],inner['cred_y_pred']))
 from sklearn.metrics import roc_auc_score
 print(roc_auc_score(inner['cred_x'],inner['cred_y']))
 
-##
+
+from transformers import pipeline
+from difflib import SequenceMatcher
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+ner_model='d4data/biomedical-ner-all'
+tokenizer_ner = AutoTokenizer.from_pretrained(ner_model)
+model_ner = AutoModelForTokenClassification.from_pretrained(ner_model)
+pipe = pipeline("ner", model=model_ner, tokenizer=tokenizer_ner, aggregation_strategy="simple") # pass device=0 if using gpu
+
+def get_entity_name(entities):
+    if len(entities)>0:
+        return_word=[]
+        for entity in entities:
+            if entity['entity_group']=='Medication':
+                if entity['word'] not in return_word:
+                    return_word.append(entity['word'])
+        if len(return_word)>0:
+            return return_word
+        else:
+            return None
+    else:
+        return None
+
+simi_score['rank']=simi_score['rank'].astype(int)
+
+docno='4bfd5dc3-61c3-4e65-a58f-826cb0a502e2'
+qid=1
+docs_df=simi_score.loc[(simi_score['docno']==docno) & (simi_score['qid']==qid)]
+sentences_support=[]
+sentences_contradict=[]
+for ii, docs in docs_df.iterrows():
+    sentens=ast.literal_eval(docs['scores'])
+    for senten in sentens:
+        if senten[1]>0.65:
+            if get_nli(senten)=='entailment' or get_nli(senten)=='neutral':
+                # doc_sen_entity_names = get_entity_name(pipe(senten[0][0].split("\t")[0]))
+                # journal_sen_entity_names = get_entity_name(pipe(senten[0][0].split("\t")[-1]))
+                # if doc_sen_entity_names and journal_sen_entity_names:
+                #     for doc_sen_entity_name in doc_sen_entity_names:
+                #         if doc_sen_entity_name in journal_sen_entity_names:
+                if senten not in sentences_support:
+                    sentences_support.append(senten)
+            elif get_nli(senten)=='contradiction':
+                if senten not in sentences_contradict:
+                    sentences_contradict.append(senten)
+sentences_sup_sorted = sorted(sentences_support, key=lambda t: t[1], reverse=True)
+sentences_con_sorted = sorted(sentences_contradict, key=lambda t: t[1], reverse=True)

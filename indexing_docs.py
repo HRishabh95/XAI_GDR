@@ -5,8 +5,8 @@ import collections
 import pandas as pd
 import numpy as np
 import pickle
-from cleantext import clean
-import pytrec_eval
+#from cleantext import clean
+#import pytrec_eval
 if not pt.started():
   pt.init()
 
@@ -41,7 +41,7 @@ def trec_generate(f):
 
 import os
 
-wic_data = '/home/ricky/Documents/PhDproject/dataset/trec/trec_20_wic_top10_en_nd.csv'
+wic_data = '/home/ubuntu/rupadhyay/dataset/TREC/trec_20_wic_top10_en_nd.csv'
 index_path='/home/ricky/Documents/PhDproject/indexs/BM25_baseline_nds'
 f = pickle.load(open(wic_data, 'rb'))
 df_docs = trec_generate(f)
@@ -59,7 +59,7 @@ else:
   indexref3 = pt.IndexRef.of(f'''{index_path}/data.properties''')
 
 
-topics=pt.io.read_topics("/home/ricky/Documents/PhDproject/dataset/trec/topics.csv", format='singleline',tokenise=True)
+topics=pt.io.read_topics("/home/ubuntu/rupadhyay/dataset/TREC/topics.csv", format='singleline',tokenise=True)
 topics['query']=topics['query'].replace("can",'',regex=True)
 BM25 = pt.BatchRetrieve(indexref3, num_results=100,controls={"wmodel": "BM25"}, properties={
   'tokeniser': 'UTFTokeniser',
@@ -73,7 +73,6 @@ results=combined_result[['qid','docid','docno','rank','score','text','query']]
 filtered_result=results.loc[results['qid']!='28']
 filtered_result.to_csv("/home/ricky/Documents/PhDproject/result/trec/docs_top_100.csv",index=None,sep='\t')
 
-
 ### TREC Eval file from pyterrier file
 def create_eval_file(df):
   docs_dfs = df[['qid', 'docno', 'rank', 'score']]
@@ -84,4 +83,12 @@ def create_eval_file(df):
                   sep=' ', index=None, header=None)
 
 
+df=pd.read_csv('./result/40_60_biobert_simi_wa_d100_j10.csv',delimiter=' ',names=['qid','Q0','docno','rank','score','names'])
+combined_result=pd.merge(df,df_docs,on='docno')
+combined_result['qid']=combined_result['qid'].astype(int)
+topics['qid']=topics['qid'].astype(int)
+df_topics=pd.merge(combined_result,topics,on='qid')
+results=df_topics[['qid','docno','rank','score','text','query']]
 
+filtered_result=results.loc[results['qid']!='28']
+filtered_result.to_csv("./docs/gen_docs_top_100.csv",index=None,sep='\t')

@@ -28,6 +28,7 @@ def get_entity_name(entities):
 qids = np.unique(simi_score.qid.values)
 cred_score = []
 for qid in qids:
+    print(qid)
     qid_simi_score = simi_score.loc[simi_score['qid'] == qid].sort_values(by=['rank'])
     docnos_index=np.unique(qid_simi_score.docno.values,return_index=True)[1]
     docnos=[qid_simi_score.docno.values[index] for index in sorted(docnos_index)]
@@ -44,10 +45,10 @@ for qid in qids:
                     if doc_sen_entity_name and arti_sen_entity_name:
                         if doc_sen_entity_name==arti_sen_entity_name:
                             docs_score.append(sentence[1])
-                        elif SequenceMatcher(None, doc_sen_entity_name,arti_sen_entity_name).ratio()>0.9:
-                            docs_score.append(sentence[1]*0.5)
+                        elif SequenceMatcher(None, doc_sen_entity_name,arti_sen_entity_name).ratio()>0.95:
+                            docs_score.append(sentence[1]*0.25)
                         else:
-                            docs_score.append(sentence[1])
+                            docs_score.append(sentence[1]*0.1)
                     else:
                         docs_score.append(0)
             else:

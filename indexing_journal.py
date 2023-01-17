@@ -5,7 +5,6 @@ import collections
 import pandas as pd
 import numpy as np
 import pickle
-from cleantext import clean
 import pytrec_eval
 if not pt.started():
   pt.init()
