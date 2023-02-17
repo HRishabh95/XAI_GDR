@@ -34,7 +34,7 @@ def clean_en_text(text):
   return text.strip().lower()
 
 wic_data = './all_journal_content.csv'
-index_path='/home/ricky/Documents/PhDproject/indexs/Goodit/journal_index_wnumbers'
+index_path='./index/journal_index_wnumbers'
 df_docs = pd.read_csv(wic_data, sep='\t', index_col=0, lineterminator='\n').dropna()
 df_docs['contents'] = df_docs.apply(lambda x: clean_en_text(x['contents']), axis=1)
 df_docs.columns = ['title', 'text', 'citation', 'views', 'j_type', 'docno']
@@ -53,7 +53,9 @@ if not os.path.exists(f'''{index_path}/data.properties'''):
 else:
   indexref3 = pt.IndexRef.of(f'''{index_path}/data.properties''')
 
-topics=pt.io.read_topics("/home/ricky/Documents/PhDproject/dataset/trec/topics.csv", format='singleline',tokenise=True)
+#topics=pt.io.read_topics("/home/ricky/Documents/PhDproject/dataset/trec/topics.csv", format='singleline',tokenise=True)
+
+topics=pt.io.read_topics("/home/ubuntu/rupadhyay/CREDPASS/clef_topics.csv", format='singleline',tokenise=True)
 
 #topics=pd.read_csv("/home/ricky/Documents/PhD project/dataset/trec/topics_des.csv",sep=' ',index_col=0)
 #topics.to_csv("/home/ricky/Documents/PhD project/dataset/trec/topics.csv",header=None,index=None,sep=' ')
@@ -66,4 +68,4 @@ combined_result=pd.merge(result,df_docs,on='docno')
 
 results=combined_result[['qid','query','docid','docno','rank','score','text']]
 
-results.to_csv("/home/ricky/Documents/PhDproject/result/trec/journal_wnum_top_30.csv",index=None,sep='\t')
+results.to_csv("./docs/journal_wnum_top_30_clef.csv",index=None,sep='\t')

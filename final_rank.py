@@ -5,9 +5,9 @@ import ast
 root_path='/tmp/pycharm_project_631/'
 journal_dfs=pd.read_csv("%s/docs/journal_wnum_top_30.csv"%root_path,sep='\t')
 #docs_dfs=pd.read_csv("%s/docs/docs_all_top_sen_ner.csv"%root_path,sep=';')
-docs_dfs=pd.read_csv("%s/docs/docs_all_top_sen_ner_manual.csv"%root_path,sep=';')
+docs_dfs=pd.read_csv("%s/docs/gen_docs_func_all_top_sen_ner_manual.csv"%root_path,sep=';')
 # simi_score=pd.read_csv('./experiments/dtop100_jtop10/Bm25_sens_similarity_score_sw_biobert.csv',sep='\t')
-simi_score=pd.read_csv('./experiments/dtop100_jtop10/ner_manual_sens_similarity_score_sw_biobert.csv',sep='\t')
+simi_score=pd.read_csv('./experiments/dtop100_jtop10/gen_ner_func_manual_sens_similarity_score_sw_biobert.csv',sep='\t')
 #
 #
 
@@ -62,6 +62,6 @@ result_df['Q0']=0
 result_df=result_df[['qid','Q0','docno','n_rank','f_score']]
 result_df.columns=['qid','Q0','docno','rank','score']
 
-result_df['experiment']='add_pass_d50_j10'
+result_df['experiment']='add_pass_ner_d50_j10'
 
-result_df.to_csv('./result/passage/wa_t3j_t3s_biobert_simi_add_d50_j10.csv', sep=' ', index=None, header=None)
+result_df.to_csv('./result/passage/wa_t3j_t3s_ner_biobert_simi_add_d50_j10.csv', sep=' ', index=None, header=None)

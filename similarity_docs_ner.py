@@ -3,7 +3,8 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.spatial import distance
-model = SentenceTransformer('pritamdeka/S-Biomed-Roberta-snli-multinli-stsb')
+#model = SentenceTransformer('pritamdeka/S-Biomed-Roberta-snli-multinli-stsb')
+model = SentenceTransformer('GPL/trec-covid-v2-msmarco-distilbert-gpl')
 #Encoding: bert-base-nli-mean-tokens
 # pritamdeka/S-PubMedBert-MS-MARCO-SCIFACT
 from nltk.tokenize import sent_tokenize
@@ -138,31 +139,39 @@ def get_vectors(dfs):
             #texts=sent_tokenize(texts)
             texts=split_into_sentences(texts)
             for i in range(0, len(texts)):
-                sen_embeddings = model.encode(texts[i])
+                c_text=clean_en_text(texts[i])
+                sen_embeddings = model.encode(c_text)
                 query_embeddings = model.encode(rows['query'])
                 query_sen_entity_name = get_entity_name(pipe(rows['query']))
-                arti_sen_entity_name = get_entity_name(pipe(texts[i]))
+                arti_sen_entity_name = get_entity_name(pipe(c_text))
                 simi=cosine_similarity([query_embeddings,sen_embeddings])[0][1]
                 if query_sen_entity_name and arti_sen_entity_name:
                     if query_sen_entity_name==arti_sen_entity_name:
                         sens+=texts[i]+"\t %s,"%(float(simi))
+                        simi=simi
                     elif SequenceMatcher(None, query_sen_entity_name, arti_sen_entity_name).ratio()>0.9:
-                        sens += texts[i] + "\t %s," % (float(simi)*0.3)
+                        sens += texts[i] + "\t %s," % (float(simi)*SequenceMatcher(None, query_sen_entity_name, arti_sen_entity_name).ratio()*0.3)
+                        simi=simi*0.1
                     else:
-                        sens += texts[i] + "\t %s," % (float(simi) * 0.1)
+                        sens += texts[i] + "\t %s," % (float(simi) * 0.01)
+                        simi=simi*0.1
                 else:
                     query_sen_entity_name=get_medication_query(rows['query'])
                     if query_sen_entity_name in texts[i]:
                         sens+=texts[i]+"\t %s,"%(float(simi))
+                        simi=simi
                     else:
-                        sens += texts[i] + "\t %s," % (float(simi) * 0.4)
+                        sens += texts[i] + "\t %s," % (float(simi) * 0.1)
+                        simi=simi*0.1
                 simis.append([texts[i],simi])
                 chuck_vecs.append(sen_embeddings*simi)
-            vecs.append(np.mean(chuck_vecs, axis=0))
-            sens_all.append(sens)
-    dfs['vectors'] = vecs
-    dfs['top_sens'] = sens_all
-    return dfs
+            #vecs.append(np.mean(chuck_vecs, axis=0))
+            sens_all.append([rows['qid'],rows['docno'],sens])
+    #dfs['vectors'] = vecs
+    sens=pd.DataFrame(sens_all,columns=['qid','docno','top_sens'])
+    dfs_final=pd.merge(dfs,sens,on=['qid','docno'])
+    return dfs_final
+
 
 #load dfs
 docs_dfs=pd.read_csv("./docs/gen_docs_top_100.csv",sep='\t')
@@ -176,7 +185,4 @@ docs_dfs=pd.read_csv("./docs/gen_docs_top_100.csv",sep='\t')
 
 #docs_dfs_1=docs_dfs[docs_dfs.qid==1]
 docs_dfs_vec=get_vectors(docs_dfs)
-docs_dfs_vec.to_csv('./docs/gen_docs_func_all_top_sen_ner_manual.csv', index=None, sep=';')
-
-
-
+docs_dfs_vec.to_csv('./docs/gen_docs_func_all_top_sen_ner_manual_covid_bert.csv', index=None, sep=';')

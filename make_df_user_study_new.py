@@ -42,8 +42,8 @@ def get_entity_name(entities):
         return None
 
 
-def get_nli(sentence):
-    sent_1, sent_2 = sentence[0].split("\t")[0], sentence[0].split("\t")[1]
+def get_nli(sentence_1,sentence_2):
+    sent_1, sent_2 = sentence_1,sentence_2
     text = f"mednli: sentence1: {sent_1} sentence2: {sent_2}"
     encoding = tokenizer.encode_plus(text, padding='max_length', max_length=256, return_tensors="pt")
     input_ids, attention_masks = encoding["input_ids"].to('cuda'), encoding["attention_mask"].to('cuda')
@@ -203,11 +203,9 @@ def clean_en_text(text):
 
 
 
-
-
 user_study_df = pd.read_csv('./docs_user_study', sep=' ', names=['docno', 'qid'])
-#simi_score = pd.read_csv('./experiments/dtop100_jtop10/gen_ner_func_manual_sens_similarity_score_sw_bm25.csv', sep='\t')
-simi_score = pd.read_csv('./experiments/dtop100_jtop10/gen_ner_func_manual_sens_similarity_score_sw_biobert.csv',sep='\t')
+#simi_score = pd.read_csv('./experiments/dtop100_jtop10/gen_ner_func_manual_sens_similarity_score_sw_tf_idf.csv', sep='\t')
+simi_score = pd.read_csv('./experiments/dtop100_jtop10/gen_ner_func_manual_sens_similarity_score_sw.csv',sep='\t')
 journal_df=pd.read_csv('journal_citation.csv',sep='\t')
 
 journal_cite_dict={}
@@ -231,36 +229,35 @@ for ii, docs in user_study_df.iterrows():
     for ii, docs_top in docs_df.iterrows():
         sentens = ast.literal_eval(docs_top['scores'])
         for senten in sentens:
-            if senten[1] > 0.0:
-                if get_nli(senten) == 'entailment' or get_nli(senten) == 'neutral':
-                    # doc_sen_entity_names = get_entity_name(pipe(senten[0][0].split("\t")[0]))
-                    # journal_sen_entity_names = get_entity_name(pipe(senten[0][0].split("\t")[-1]))
-                    # if doc_sen_entity_names and journal_sen_entity_names:
-                    #     for doc_sen_entity_name in doc_sen_entity_names:
-                    #         if doc_sen_entity_name in journal_sen_entity_names:
-                    if senten not in sentences_support:
-                        sentences_support.append(senten)
-                        journal_dicts.append([senten,senten[1],docs_top['j_docno']])
-    sentences_sup_sorted = sorted(journal_dicts, key=lambda t: t[1], reverse=True)
+            sent_vals=sentens[senten]
+            for sent_val in sent_vals:
+                if sent_val[1] > 0.50:
+                    nlu=get_nli(senten,sent_val[0])
+                    if nlu == 'entailment' or nlu == 'neutral':
+                        if [senten,sent_val[0]] not in sentences_support:
+                            sentences_support.append([senten,sent_val[0]])
+                            journal_dicts.append([senten,sent_val[0],sent_val[1],sent_val[2]])
+    sentences_sup_sorted = sorted(journal_dicts, key=lambda t: t[2], reverse=True)
     sentence_dict = {}
     for sentences_sup_sort in sentences_sup_sorted:
-        doc_sen = sentences_sup_sort[0][0].split("\t")[0]
-        jou_sen = sentences_sup_sort[0][0].split("\t")[1]
+        doc_sen = sentences_sup_sort[0]
+        jou_sen = sentences_sup_sort[1]
         j_docno = sentences_sup_sort[-1]
-        if sentences_sup_sort[1]>0.45:
+        if sentences_sup_sort[2]>0.50:
             if doc_sen not in sentence_dict:
                 sentence_dict[doc_sen] = []
-                if j_docno in journal_cite_dict:
-                    sentence_dict[doc_sen].append([jou_sen.rstrip().lstrip(),sentences_sup_sort[1],journal_cite_dict[j_docno],
+                if j_docno in journal_cite_dict and len(sentence_dict[doc_sen])<6:
+                    sentence_dict[doc_sen].append([jou_sen.rstrip().lstrip(),sentences_sup_sort[2],journal_cite_dict[j_docno],
                                                    journal_url_dict[j_docno]])
             else:
-                if j_docno in journal_cite_dict:
-                    sentence_dict[doc_sen].append([jou_sen.rstrip().lstrip(),sentences_sup_sort[1],journal_cite_dict[j_docno],
+                if j_docno in journal_cite_dict and len(sentence_dict[doc_sen])<6:
+                    sentence_dict[doc_sen].append([jou_sen.rstrip().lstrip(),sentences_sup_sort[2],journal_cite_dict[j_docno],
                                                    journal_url_dict[j_docno]])
     sentences_dicts.append(sentence_dict)
 
+filename='docs_func_user_study_sen_j_id_055_bert.csv'
 user_study_df['sentence_dicts'] = sentences_dicts
-user_study_df.to_csv('docs_func_user_study_sen_j_id_055_bm25.csv', sep='\t', index=False)
+user_study_df.to_csv(filename, sep='\t', index=False)
 
 
 def get_headline(abstract):
@@ -273,22 +270,10 @@ def get_headline(abstract):
     preds = [tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=True) for g in generated_ids]
     return preds
 
-#model_name_sum = "google/pegasus-xsum"
-# tokenizer_sum = PegasusTokenizer.from_pretrained(model_name_token)
-# model_sum = PegasusForConditionalGeneration.from_pretrained(model_name_sum)
-
-# def get_headline(doc_text):
-#     src_text = [doc_text]
-#     batch = tokenizer_sum(src_text, max_length=250,truncation=True, padding="longest", return_tensors="pt")
-#     translated = model_sum.generate(**batch)
-#     tgt_text = tokenizer_sum.batch_decode(translated, skip_special_tokens=True)
-#     return tgt_text
-
-
 import pandas as pd
 
-user_study_df = pd.read_csv('docs_func_user_study_sen_j_id_055.csv', sep='\t')
-
+user_study_df = pd.read_csv(filename, sep='\t')
+#
 import pyterrier as pt
 
 if not pt.started():
@@ -313,22 +298,20 @@ wic_data = '/home/ubuntu/rupadhyay/dataset/TREC/trec_20_wic_top10_en_nd.csv'
 f = pickle.load(open(wic_data, 'rb'))
 df_docs = trec_generate(f)
 
-text=df_docs[df_docs['docno']=='06413b57-7f8d-4278-a990-ff2ba9c78517']
-
 user_study_qid_df = pd.merge(user_study_qid_df, df_docs, on='docno')
 
 id=0
 doc_coloured = []
 for ii, user_study_qid_data in user_study_qid_df.iterrows():
     sents=''
-    text_coloured=''
+    text_coloured={}
     texts=user_study_qid_data['text']
     header=get_headline(texts)
     import ast, re
     sens = user_study_qid_data['sentence_dicts']
     if not isinstance(sens, dict):
         sens = ast.literal_eval(sens)
-    sens_a = list(sens.keys())
+    sens_a = list(sens.keys())[:5]
     if sens_a:
         #sens_a = sens_a[0]
         #for sen_a in sens_a:
@@ -342,7 +325,9 @@ for ii, user_study_qid_data in user_study_qid_df.iterrows():
                 if i_clean == j:
                     #first_text.append('<span style="background-color:rgba(255,215,0,0.3);"> ' + i + ' </span>')
                     first_text.append('<b><i>'+i+'</i></b>')
-                    text_coloured+=i+"\t"
+                    if i_clean not in text_coloured:
+                        text_coloured[i_clean]=i
+
                 else:
                     first_text.append(i)
         first_text = ' '.join(first_text)
@@ -361,6 +346,6 @@ for ii, combined in combined_df.iterrows():
         im_sentences.append(list(combined['sentence_dicts'].items())[0][0])
 
 combined_df['im_sent']=im_sentences
-combined_df.to_csv('docs_func_user_study_xai_j_id_bm25_multiple_sens.v1.csv',sep='\t',index=False)
+combined_df.to_csv('docs_func_user_study_xai_bert_j_id_multiple_sens.v1.csv',sep='\t',index=False)
 
 

@@ -1,10 +1,7 @@
 import pandas as pd
-from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-model = SentenceTransformer('pritamdeka/S-Biomed-Roberta-snli-multinli-stsb').to('cuda')
 import numpy as np
-from nltk.tokenize import sent_tokenize
-#Encoding: bert-base-nli-mean-tokens
 
 import errno
 import os
@@ -41,41 +38,6 @@ def clean_en_text(text):
   text = remove_whitespaces(text)
   return text.strip().lower()
 
-#
-# def get_vectors(dfs,window=20):
-#     vecs = []
-#     for ii, rows in dfs.iterrows():
-#         chuck_vecs = []
-#         texts = clean_en_text(rows['text'])
-#         simis=[]
-#         for i in range(0, len(texts.split()), 512-window):
-#             texts_512 = " ".join(texts.split()[i:i + 512-window])
-#             sen_embeddings = model.encode(texts_512)
-#             query_embeddings = model.encode(rows['query'])
-#             simi=cosine_similarity([query_embeddings,sen_embeddings])[0][1]
-#             simis.append(simi)
-#             chuck_vecs.append(sen_embeddings*simi)
-#         vecs.append(np.mean(chuck_vecs, axis=0))
-#     dfs['vectors'] = vecs
-#     return dfs
-
-
-# def get_vectors(dfs):
-#     vecs = []
-#     for ii, rows in dfs.iterrows():
-#         chuck_vecs = []
-#         texts = clean_en_text(rows['text'])
-#         simis=[]
-#         texts=texts.split('.')
-#         for i in range(0, len(texts)):
-#             sen_embeddings = model.encode(texts[i])
-#             query_embeddings = model.encode(rows['query'])
-#             simi=cosine_similarity([query_embeddings,sen_embeddings])[0][1]
-#             simis.append([texts[i],simi])
-#             chuck_vecs.append(sen_embeddings*simi)
-#         vecs.append(np.mean(chuck_vecs, axis=0))
-#     dfs['vectors'] = vecs
-#     return dfs
 
 
 
@@ -116,6 +78,8 @@ def split_into_sentences(text):
     sentences = [s.strip() for s in sentences]
     return sentences
 
+vectorizer = TfidfVectorizer()
+
 def get_score_n(journal_dfs,docs_dfs,root_path,top_n=10,d_top=100):
     qids = np.unique(docs_dfs.qid.values)
     similarity = []
@@ -125,20 +89,22 @@ def get_score_n(journal_dfs,docs_dfs,root_path,top_n=10,d_top=100):
         docs_tops = docs_dfs.loc[docs_dfs['qid'] == qid].sort_values(by=['rank'])
         for ii, doc_rows in docs_tops.iterrows():
             print(qid,ii)
+
             doc_sens = [(i.split('\t')[0],float(i.split('\t')[1])) for i in doc_rows['top_sens'].split(",") if len(i)>0]
             doc_sens_sorted=sorted(doc_sens, key=lambda t: t[1], reverse=True)
             doc_sens_simi={}
             for doc_sen in doc_sens_sorted:
                 sens_evi=''
                 if doc_sen[-1]>0.0:
-                    doc_sen_vec = model.encode(doc_sen[0])
                     for jj, journal_rows in journal_tops.iterrows():
+                        vectorizer.fit([doc_rows['text'],journal_rows['text']])
                         texts = split_into_sentences(journal_rows['text'])
+                        doc_sen_vec = vectorizer.transform([doc_sen[0]]).toarray()
                         for sen in texts:
                             if len(sen.split(" "))>5:
-                                jou_sen_vec=model.encode(sen)
-                                simi = cosine_similarity([doc_sen_vec, jou_sen_vec])[0][1]
-                                if simi>0.5:
+                                jou_sen_vec=vectorizer.transform([sen]).toarray()
+                                simi = cosine_similarity([doc_sen_vec[0], jou_sen_vec[0]])[0][1]
+                                if simi>0.0:
                                     sens_evi+='%s\t %s\t %s,'%(doc_sen[0],sen,simi)
                         journal_evi_sorted = sorted([('%s\t %s' % (i.split('\t')[0], i.split('\t')[1]), float(i.split('\t')[-1])) for i
                                         in sens_evi.split(",") if len(i) > 0], key=lambda t:t[1],reverse=True)[:10]
@@ -158,14 +124,14 @@ def get_score_n(journal_dfs,docs_dfs,root_path,top_n=10,d_top=100):
     similarity_df = pd.DataFrame(similarity, columns=['qid', 'docno', 'scores','rank'])
     similarity_path=f'''{root_path}/experiments/dtop{d_top}_jtop{top_n}'''
     mkdir_p(similarity_path)
-    similarity_df.to_csv('%s/gen_ner_func_manual_sens_similarity_score_sw.csv'%similarity_path, index=None, sep='\t')
+    similarity_df.to_csv('%s/gen_ner_func_manual_sens_similarity_score_sw_tf_idf.csv'%similarity_path, index=None, sep='\t')
     return similarity_df
 
 #load dfs
 root_path='/tmp/pycharm_project_631/'
 journal_dfs=pd.read_csv("%s/docs/journal_wnum_top_30.csv"%root_path,sep='\t')
 #docs_dfs=pd.read_csv("%s/docs/docs_all_top_sen_ner.csv"%root_path,sep=';')
-docs_dfs=pd.read_csv("%s/docs/gen_docs_func_all_top_sen_ner_manual.csv"%root_path,sep=';')
+docs_dfs=pd.read_csv("%s/docs/gen_docs_func_all_top_sen_tf_idf.csv"%root_path,sep=';')
 #docs_dfs=pd.read_csv("%s/docs/docs_all_sens_bm25_ner.csv"%root_path,sep=';')
 user_study_df = pd.read_csv('./docs_user_study', sep=' ', names=['docno', 'qid'])
 docs_dfs = pd.merge(docs_dfs, user_study_df, on=['qid','docno'])
