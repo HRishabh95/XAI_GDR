@@ -1,7 +1,7 @@
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-model = SentenceTransformer('pritamdeka/S-Biomed-Roberta-snli-multinli-stsb').to('cuda')
+model = SentenceTransformer('pritamdeka/S-Biomed-Roberta-snli-multinli-stsb')
 import numpy as np
 from nltk.tokenize import sent_tokenize
 #Encoding: bert-base-nli-mean-tokens
@@ -124,10 +124,9 @@ def get_score_n(journal_dfs,docs_dfs,root_path,top_n=10,d_top=100):
         journal_tops = journal_dfs.loc[journal_dfs['qid'] == qid].sort_values(by=['rank']).head(top_n)
         docs_tops = docs_dfs.loc[docs_dfs['qid'] == qid].sort_values(by=['rank'])
         for ii, doc_rows in docs_tops.iterrows():
-            print(qid,ii)
             doc_sens = [(i.split('\t')[0],float(i.split('\t')[1])) for i in doc_rows['top_sens'].split(",") if len(i)>0]
             doc_sens_sorted=sorted(doc_sens, key=lambda t: t[1], reverse=True)
-            doc_sens_simi={}
+            doc_sens_simi=[]
             for doc_sen in doc_sens_sorted:
                 sens_evi=''
                 if doc_sen[-1]>0.0:
@@ -138,35 +137,26 @@ def get_score_n(journal_dfs,docs_dfs,root_path,top_n=10,d_top=100):
                             if len(sen.split(" "))>5:
                                 jou_sen_vec=model.encode(sen)
                                 simi = cosine_similarity([doc_sen_vec, jou_sen_vec])[0][1]
-                                if simi>0.5:
+                                if simi>0.0:
                                     sens_evi+='%s\t %s\t %s,'%(doc_sen[0],sen,simi)
                         journal_evi_sorted = sorted([('%s\t %s' % (i.split('\t')[0], i.split('\t')[1]), float(i.split('\t')[-1])) for i
                                         in sens_evi.split(",") if len(i) > 0], key=lambda t:t[1],reverse=True)[:10]
-                        if journal_evi_sorted:
-                            for journal_evi_sort in journal_evi_sorted:
-                                if journal_evi_sort[0].split("\t")[0] not in doc_sens_simi:
-                                    doc_sens_simi[journal_evi_sort[0].split("\t")[0]]=[]
-                                    if [journal_evi_sort[0].split("\t")[1],journal_evi_sort[1],journal_rows['docno']] not in doc_sens_simi[journal_evi_sort[0].split("\t")[0]]:
-                                        doc_sens_simi[journal_evi_sort[0].split("\t")[0]].append([journal_evi_sort[0].split("\t")[1],journal_evi_sort[1],journal_rows['docno']])
-                                else:
-                                    if [journal_evi_sort[0].split("\t")[1],journal_evi_sort[1],journal_rows['docno']] not in doc_sens_simi[journal_evi_sort[0].split("\t")[0]]:
-                                        doc_sens_simi[journal_evi_sort[0].split("\t")[0]].append(
-                                        [journal_evi_sort[0].split("\t")[1], journal_evi_sort[1],journal_rows['docno']])
+                        doc_sens_simi.append(journal_evi_sorted)
 
             similarity.append([qid, doc_rows['docno'],doc_sens_simi,doc_rows['rank']])
 
-    similarity_df = pd.DataFrame(similarity, columns=['qid', 'docno', 'scores','rank'])
+    similarity_df = pd.DataFrame(similarity, columns=['qid', 'docno', 'j_docno', 'scores','rank'])
     similarity_path=f'''{root_path}/experiments/dtop{d_top}_jtop{top_n}'''
     mkdir_p(similarity_path)
-    similarity_df.to_csv('%s/gen_ner_func_manual_sens_similarity_score_sw.csv'%similarity_path, index=None, sep='\t')
+    similarity_df.to_csv('%s/gen_ner_func_manual_sens_similarity_score_sw_bm25.csv'%similarity_path, index=None, sep='\t')
     return similarity_df
 
 #load dfs
 root_path='/tmp/pycharm_project_631/'
 journal_dfs=pd.read_csv("%s/docs/journal_wnum_top_30.csv"%root_path,sep='\t')
 #docs_dfs=pd.read_csv("%s/docs/docs_all_top_sen_ner.csv"%root_path,sep=';')
-docs_dfs=pd.read_csv("%s/docs/gen_docs_func_all_top_sen_ner_manual.csv"%root_path,sep=';')
-#docs_dfs=pd.read_csv("%s/docs/docs_all_sens_bm25_ner.csv"%root_path,sep=';')
+#docs_dfs=pd.read_csv("%s/docs/gen_docs_func_all_top_sen_ner_manual.csv"%root_path,sep=';')
+docs_dfs=pd.read_csv("%s/docs/docs_all_sens_bm25_ner.csv"%root_path,sep=';')
 user_study_df = pd.read_csv('./docs_user_study', sep=' ', names=['docno', 'qid'])
 docs_dfs = pd.merge(docs_dfs, user_study_df, on=['qid','docno'])
 qids=np.unique(docs_dfs['qid'].values)
@@ -177,10 +167,8 @@ journal_dfs=journal_dfs[journal_dfs['qid'].isin(qids)]
 #docs_dfs_vec=get_vectors(docs_dfs_1)
 docs_dfs.dropna(inplace=True)
 simi_score=get_score_n(journal_dfs,docs_dfs,root_path)
-
-
-
-
+# #
+# #
 # import pandas as pd
 # import numpy as np
 # import ast

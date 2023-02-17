@@ -1,11 +1,13 @@
 import pandas as pd
 import numpy as np
-from pyDecision.algorithm import edas_method,saw_method,critic_method
 
 
-simi_score=pd.read_csv('./experiments/dtop100_jtop10/w_similarity_score_sw_biobert.csv', sep='\t')
-topicality_dfs = pd.read_csv("/home/ricky/Documents/PhDproject/result/trec/docs_top_100.csv", sep='\t')
-
+# simi_score=pd.read_csv('./experiments/dtop100_jtop10/clef2020_similarity_biobert.csv', sep='\t')
+simi_score=pd.read_csv("./experiments/dtop100_jtop10/trec_1M_similarity_biobert.csv",sep='\t')
+#topicality_dfs = pd.read_csv("/home/ricky/Documents/PhDproject/result/trec/docs_top_100.csv", sep='\t')
+topicality_dfs=pd.read_csv("/home/ubuntu/rupadhyay/CREDPASS/docs/TREC2020_BM25_clean_100.csv",sep='\t')
+#CLEF
+# topicality_dfs = pd.read_csv("/tmp/pycharm_project_631/docs/clef2020_docs.csv", sep=';')
 
 def convert_scoreto_column(simi_score):
     qids = np.unique(simi_score.qid.values)
@@ -24,16 +26,16 @@ def convert_scoreto_column(simi_score):
     return fixed_dfs
 
 
-def get_final_cred_score_weights(simi_score):
-    fixed_dfs = convert_scoreto_column(simi_score)
-
-    fixed_dfs = fixed_dfs.drop(['docno', 'qid'], axis=1)
-    fixed_dfs = fixed_dfs.to_numpy(dtype=np.float64)
-    # Load Criterion Type: 'max' or 'min'
-    criterion_type = ['max', 'max', 'max', 'max', 'min', 'min', 'min', 'min', 'min', 'min']
-    #criterion_type=['max', 'max', 'max', 'max', 'max', 'max', 'max', 'max', 'max', 'max','max', 'max', 'min', 'min', 'min', 'min', 'min', 'min', 'min', 'min']
-    weights = critic_method(fixed_dfs, criterion_type)
-    return weights
+# def get_final_cred_score_weights(simi_score):
+#     fixed_dfs = convert_scoreto_column(simi_score)
+#
+#     fixed_dfs = fixed_dfs.drop(['docno', 'qid'], axis=1)
+#     fixed_dfs = fixed_dfs.to_numpy(dtype=np.float64)
+#     # Load Criterion Type: 'max' or 'min'
+#     criterion_type = ['max', 'max', 'max', 'max', 'min', 'min', 'min', 'min', 'min', 'min']
+#     #criterion_type=['max', 'max', 'max', 'max', 'max', 'max', 'max', 'max', 'max', 'max','max', 'max', 'min', 'min', 'min', 'min', 'min', 'min', 'min', 'min']
+#     weights = critic_method(fixed_dfs, criterion_type)
+#     return weights
 
 
 def get_averaged_score(simi_score):
@@ -53,39 +55,8 @@ def get_averaged_score(simi_score):
     ave_cred = pd.DataFrame(average_dfs, columns=['qid', 'Q0', 'docno', 'c_score'])
     return ave_cred
 
-def get_weights(final_df,method=None):
-    if method=='AHP':
-        from pyDecision.algorithm import ahp_method
-        weight_derivation = 'geometric'
-
-        dataset = np.array([
-            [1, 2],
-            [1 / 2, 1]
-        ])
-
-        weights, rc = ahp_method(dataset, wd=weight_derivation)
-    #
-    # # Consistency Ratio
-    # print('RC: ' + str(round(rc, 2)))
-    # if (rc > 0.10):
-    #     print('The solution is inconsistent, the pairwise comparisons must be reviewed')
-    # else:
-    #     print('The solution is consistent')
-    elif method=='critic':
-
-        docno = final_df['docno'].values
-        qid = final_df['qid'].values
-
-        fixed_dfs = final_df[['score_zscore', 'c_score']]
-        fixed_dfs = fixed_dfs.to_numpy(dtype=np.float64)
-        weights = np.array([0.6, 0.4])
-
-        # Load Criterion Type: 'max' or 'min'
-        criterion_type = ['max', 'max']
-        weights=critic_method(fixed_dfs,criterion_type)
-
-    else:
-        weights=[0.4,0.6]
+def get_weights():
+    weights=[0.4,0.6]
     return weights
 
 def get_zscore(final_df):
@@ -102,14 +73,15 @@ def get_zscore(final_df):
 def get_result_df(simi_score):
     ave_cred=get_averaged_score(simi_score)
 
-    topicality_dfs=pd.read_csv("/home/ricky/Documents/PhDproject/result/trec/docs_top_100.csv",sep='\t')
     final_df=ave_cred.merge(topicality_dfs,on=['qid','docno'])
+
+    final_df.to_csv('//tmp/pycharm_project_631/experiments/dtop100_jtop10/combined_df_biobert.csv',sep='\t',index=None)
 
     normalized_df=get_zscore(final_df)
 
 
-    weights=get_weights(normalized_df,method=None)
-    final_df['combined_score']=normalized_df['score_zscore']*weights[0]+normalized_df['c_score']*weights[1]
+    weights=get_weights()
+    final_df['combined_score']=final_df['score']*weights[0]+final_df['c_score']*weights[1]
 
     qids = np.unique(simi_score.qid.values)
     sorted_dfs=[]
@@ -124,10 +96,12 @@ def get_result_df(simi_score):
     sorted_qid_df_concat=pd.concat(sorted_dfs)
 
 
-    result_df=sorted_qid_df_concat[['qid','Q0','docno','n_rank','combined_score']]
+    result_df=sorted_qid_df_concat[['qid','docno','n_rank','combined_score']]
+    result_df['Q0']=0
+    result_df=result_df[['qid','Q0','docno','n_rank','combined_score']]
     result_df.columns=['qid','Q0','docno','rank','score']
-    result_df['experiment']='wa_d100_j10'
-    result_df.to_csv('./result/weighted_40_60_biobert_simi_wa_d100_j10.csv',sep=' ',index=None,header=None)
+    result_df['experiment']='trec_1M_wa_d100_j10'
+    result_df.to_csv('./result/40_60_biobert_simi_wa_d100_j10_trec_1M.csv',sep=' ',index=None,header=None)
     return result_df
 
 
