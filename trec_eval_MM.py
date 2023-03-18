@@ -25,13 +25,6 @@ for i in range(len(top_p_10)):
     MM_P_10=hmean([top_p_10[i],cred_p_10[i]])
     print(MM_NDCG,MM_P_10)
 
-## Top10
-## Baseline 0.461 0.8612
-## Model 1 0.469 0.8676
-## Model 2 0.474 0.8701
-## Model 3 0.481 0.8813
-## Model 4 0.493 0.8951
-
 
 
 ## Top5

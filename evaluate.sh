@@ -1,12 +1,12 @@
 docs=10
-SUMMARY="/tmp/pycharm_project_631/result/passage/wa_t3j_t3s_biobert_simi_add_d50_j10.${docs}.summary"
+SUMMARY="/tmp/pycharm_project_631/result/passage/wa_t3j_t3s_ner_biobert_simi_add_d50_j10.${docs}.summary"
 printf "run\tqrels\tmeasure\ttopic\tscore\n" > $SUMMARY
-RUN_FILE_PATH="/tmp/pycharm_project_631/result/passage/wa_t3j_t3s_biobert_simi_add_d50_j10.csv"
+RUN_FILE_PATH="/tmp/pycharm_project_631/result/passage/wa_t3j_t3s_ner_biobert_simi_add_d50_j10.csv"
 
 QRELS="/tmp/pycharm_project_631/qrels"
 trec_eval='/home/ubuntu/rupadhyay/Trec_eval_extension/'
-cd trec_eval
-compatibility="/home/ricky/Documents/PhDproject/Project_folder/Compatibility/compatibility.py"
+cd $trec_eval
+#compatibility="/home/ricky/Documents/PhDproject/Project_folder/Compatibility/compatibility.py"
 
 $trec_eval/trec_eval -q -c -M ${docs} -m cam_map -R qrels_twoaspects $QRELS/misinfo-qrels.2aspects.useful-credible $RUN_FILE_PATH | gawk '{print "'$RUN_NAME'" "\t" "2aspects.useful-credible" "\t" $1 "\t" $2 "\t" $3}' >> $SUMMARY
 

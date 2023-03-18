@@ -75,15 +75,16 @@ def get_score_n(journal_dfs,docs_dfs,root_path,top_n=10,d_top=100):
                 similarity.append([qid, doc_rows['docno'], journal_rows['docno'],simi])
 
     similarity_df = pd.DataFrame(similarity, columns=['qid', 'docno', 'j_docno', 'scores'])
-    similarity_path=f'''{root_path}/experiments/dtop{d_top}_jtop{top_n}'''
+    similarity_path=f'''{root_path}/experiments/dtop{d_top}_jtop{top_n}_abstract'''
     mkdir_p(similarity_path)
-    similarity_df.to_csv('%s/trec_1M_similarity_biobert.csv'%similarity_path, index=None, sep='\t')
+    similarity_df.to_csv('%s/clef_1M_similarity_biobert.csv'%similarity_path, index=None, sep='\t')
     return similarity_df
 
 #load dfs
 root_path='/tmp/pycharm_project_631/'
-journal_dfs=pd.read_csv("%s/docs/journal_wnum_top_30.csv"%root_path,sep='\t')
-docs_dfs=pd.read_csv("/home/ubuntu/rupadhyay/CREDPASS/docs/TREC2020_BM25_clean_100.csv",sep=';')
+journal_dfs=pd.read_csv("%s/docs/journal_wnum_top_30_clef_abstract.csv"%root_path,sep='\t')
+# docs_dfs=pd.read_csv("/home/ubuntu/rupadhyay/CREDPASS/docs/TREC2020_BM25_clean_100.csv",sep=';')
+docs_dfs=pd.read_csv("/home/ubuntu/rupadhyay/CREDPASS/docs/Clef2020_BM25_100.csv",sep='\t')
 
 qids = np.unique(docs_dfs.qid.values)
 sens_all = []

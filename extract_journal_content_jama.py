@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 headers = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
 
-journal_lists = pd.read_csv('./jama_journal.csv', sep='\t', header=None)
+journal_lists = pd.read_csv('./jama_journal.v2.csv', sep='\t', header=None)
 
 
 def get_title(soup):
@@ -68,10 +68,11 @@ session = requests.Session()
 session.mount("https://jamanetwork.com/", gateway)
 
 
+
 def multi_process_scrap(i):
     try:
         r = session.get(i, headers=headers)
-        print(r.status_code)
+        print(i)
     except:
         print('ReTrying about 5 seconds')
         return None
@@ -80,13 +81,13 @@ def multi_process_scrap(i):
 
     # if title:
     name = hashlib.sha256(title.encode()).hexdigest()
-    if not os.path.isfile("/Users/ricky/PycharmProjects/pseudo_journals_Goodit/jama/%s.csv" % name):
+    if not os.path.isfile("./jamav2/%s.csv" % name):
         citation, views = get_citation_views(soup)
         contents = get_content(soup)
         j_type = get_type_journal(soup)
         ddfs = pd.DataFrame([[title, contents, citation, views, j_type]],
                             columns=['title', 'contents', 'citation', 'views', 'j_type'])
-        ddfs.to_csv("/Users/ricky/PycharmProjects/pseudo_journals_Goodit/jama/%s.csv" % name, sep='\t')
+        ddfs.to_csv("./jamav2/%s.csv" % name, sep='\t')
         return ddfs
     else:
         return None
@@ -108,22 +109,31 @@ pool.join()
 import pandas as pd
 import os
 
-csv_paths = os.listdir("jama/")
+csv_paths = os.listdir("jamav2/")
 combine_df = pd.DataFrame()
 for csv_path in csv_paths:
     # try:
-    d = pd.read_csv(f'''./jama/{csv_path}''', sep='\t', index_col=0, lineterminator='\n')
+    d = pd.read_csv(f'''./jamav2/{csv_path}''', sep='\t', index_col=0, lineterminator='\n')
     combine_df = combine_df.append(d, ignore_index=True)
     # except:
     #    print(csv_path)
 
-combine_df.to_csv("./jama_journal_content.csv", sep='\t')
-
-elif_df = pd.read_csv('./elif_journal_content.csv', sep='\t')
+combine_df.to_csv("./jama_journal_content.v2.csv", sep='\t',index=False)
+#
+elif_df = pd.read_csv('./elif_journal_content.v2.csv', sep='\t')
+elif_df.dropna(subset=['content'],inplace=True)
+elif_df.columns=['title','contents','citation','views']
+elif_df['j_type']='elif'
+combine_df = pd.read_csv('./jama_journal_content.v2.csv', sep='\t',lineterminator='\n',index_col=0)
 final_df = pd.concat([combine_df, elif_df], ignore_index=True).reindex(combine_df.columns, axis='columns')
 
 import uuid
 
 final_df['id'] = [str(uuid.uuid4()) for _ in range(len(final_df.index))]
+#
+# final_df.to_csv("./all_journal_content.v2.csv", sep='\t',index=None)
 
-final_df.to_csv("./all_journal_content.csv", sep='\t')
+final_df_2=pd.read_csv("./all_journal_content.csv",sep='\t',index_col=0,lineterminator='\n')
+
+final_df=pd.concat([final_df, final_df_2], ignore_index=True).reindex(final_df.columns, axis='columns')
+

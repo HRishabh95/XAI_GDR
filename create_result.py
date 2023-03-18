@@ -101,7 +101,7 @@ def get_result_df(simi_score):
     result_df=result_df[['qid','Q0','docno','n_rank','combined_score']]
     result_df.columns=['qid','Q0','docno','rank','score']
     result_df['experiment']='trec_1M_wa_d100_j10'
-    result_df.to_csv('./result/40_60_biobert_simi_wa_d100_j10_trec_1M.csv',sep=' ',index=None,header=None)
+    result_df.to_csv('./result/40_60_biobert_simi_wa_d100_j10_trec_20.csv',sep=' ',index=None,header=None)
     return result_df
 
 
