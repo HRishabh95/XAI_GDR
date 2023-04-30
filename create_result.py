@@ -3,9 +3,11 @@ import numpy as np
 
 
 # simi_score=pd.read_csv('./experiments/dtop100_jtop10/clef2020_similarity_biobert.csv', sep='\t')
-simi_score=pd.read_csv("./experiments/dtop100_jtop10/trec_1M_similarity_biobert.csv",sep='\t')
+simi_score=pd.read_csv("./experiments/dtop100_jtop10_abstract/trec_1M_similarity_biobert_fields.csv",sep='\t')
 #topicality_dfs = pd.read_csv("/home/ricky/Documents/PhDproject/result/trec/docs_top_100.csv", sep='\t')
+# topicality_dfs=pd.read_csv("/home/ubuntu/rupadhyay/CREDPASS/docs/Clef2020_BM25_100.csv",sep='\t')
 topicality_dfs=pd.read_csv("/home/ubuntu/rupadhyay/CREDPASS/docs/TREC2020_BM25_clean_100.csv",sep='\t')
+
 #CLEF
 # topicality_dfs = pd.read_csv("/tmp/pycharm_project_631/docs/clef2020_docs.csv", sep=';')
 
@@ -75,9 +77,9 @@ def get_result_df(simi_score):
 
     final_df=ave_cred.merge(topicality_dfs,on=['qid','docno'])
 
-    final_df.to_csv('//tmp/pycharm_project_631/experiments/dtop100_jtop10/combined_df_biobert.csv',sep='\t',index=None)
+    # final_df.to_csv('//tmp/pycharm_project_631/experiments/dtop100_jtop10/combined_df_biobert.csv',sep='\t',index=None)
 
-    normalized_df=get_zscore(final_df)
+    # normalized_df=get_zscore(final_df)
 
 
     weights=get_weights()
@@ -101,7 +103,7 @@ def get_result_df(simi_score):
     result_df=result_df[['qid','Q0','docno','n_rank','combined_score']]
     result_df.columns=['qid','Q0','docno','rank','score']
     result_df['experiment']='trec_1M_wa_d100_j10'
-    result_df.to_csv('./result/40_60_biobert_simi_wa_d100_j10_trec_20.csv',sep=' ',index=None,header=None)
+    result_df.to_csv('./result_abstract/40_60_biobert_simi_wa_d100_j10_trec_fields.csv',sep=' ',index=None,header=None)
     return result_df
 
 

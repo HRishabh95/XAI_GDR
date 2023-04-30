@@ -34,33 +34,45 @@ def clean_en_text(text):
   return text.strip().lower()
 
 wic_data = './all_journal_content_abstract.csv'
-index_path='./index/journal_index_wnumbers_abstract'
+index_path='./index/journal_index_wnumbers_abstract_fields'
 df_docs = pd.read_csv(wic_data, sep='\t', index_col=0, lineterminator='\n').dropna()
 df_docs['contents'] = df_docs.apply(lambda x: clean_en_text(x['contents']), axis=1)
 df_docs['abstract'] = df_docs.apply(lambda x: clean_en_text(x['abstract']), axis=1)
 df_docs.columns = ['title', 'text', 'citation', 'views', 'j_type', 'docno','abstract']
 
+
 df_docs.drop_duplicates(inplace=True)
+
+df_dict=df_docs.to_dict('records')
 
 if not os.path.exists(f'''{index_path}/data.properties'''):
 
-  indexer = pt.DFIndexer(index_path, overwrite=True, verbose=True, Threads=8)
+  # indexer = pt.DFIndexer(index_path, overwrite=True, verbose=True, Threads=8)
+  # indexer.setProperty("tokeniser",
+  #                     "UTFTokeniser")  # Replaces the default EnglishTokeniser, which makes assumptions specific to English
+  # indexer.setProperty("termpipelines", "PorterStemmer")  # Removes the default PorterStemmer (English)
+  # #indexer.setProperty('metaindex.compressed.crop.long',
+  # #                    'true')  # Replaces the default EnglishTokeniser, which makes assumptions specific to English
+  # indexref3 = indexer.index(df_docs["abstract"], df_docs["docno"])
+
+  indexer = pt.IterDictIndexer(index_path,  overwrite=True, verbose=True, Threads=8)
   indexer.setProperty("tokeniser",
                       "UTFTokeniser")  # Replaces the default EnglishTokeniser, which makes assumptions specific to English
   indexer.setProperty("termpipelines", "PorterStemmer")  # Removes the default PorterStemmer (English)
-  #indexer.setProperty('metaindex.compressed.crop.long',
-  #                    'true')  # Replaces the default EnglishTokeniser, which makes assumptions specific to English
-  indexref3 = indexer.index(df_docs["abstract"], df_docs["docno"])
+  indexer.setProperty('metaindex.compressed.crop.long',
+                     'true')  # Replaces the default EnglishTokeniser, which makes assumptions specific to English
+
+  indexref3 = indexer.index(df_dict,fields=['text','abstract'],meta=['docno'])
 else:
   indexref3 = pt.IndexRef.of(f'''{index_path}/data.properties''')
 
 
-# topics=pt.io.read_topics("/home/ricky/Documents/PhDproject/dataset/trec/topics.csv", format='singleline',tokenise=True)
-topics=pt.io.read_topics("/home/ubuntu/rupadhyay/CREDPASS/clef_topics.csv", format='singleline',tokenise=True)
+topics=pt.io.read_topics("/home/ubuntu/rupadhyay/CREDPASS/trec_topics.csv", format='singleline',tokenise=True)
+# topics=pt.io.read_topics("/home/ubuntu/rupadhyay/CREDPASS/clef_topics.csv", format='singleline',tokenise=True)
 
 #topics=pd.read_csv("/home/ricky/Documents/PhD project/dataset/trec/topics_des.csv",sep=' ',index_col=0)
 #topics.to_csv("/home/ricky/Documents/PhD project/dataset/trec/topics.csv",header=None,index=None,sep=' ')
-BM25 = pt.BatchRetrieve(indexref3, num_results=30,controls={"wmodel": "BM25"}, properties={
+BM25 = pt.BatchRetrieve(indexref3, num_results=30,controls={"wmodel": "BM25F"}, properties={
   'tokeniser': 'UTFTokeniser',
   'termpipelines': 'Stopwords,PorterStemmer', })
 
@@ -69,4 +81,4 @@ combined_result=pd.merge(result,df_docs,on='docno')
 
 results=combined_result[['qid','query','docid','docno','rank','score','text','abstract']]
 
-results.to_csv("./docs/journal_wnum_top_30_clef_abstract.csv",index=None,sep='\t')
+results.to_csv("./docs/journal_wnum_top_30_trec_fields.csv",index=None,sep='\t')

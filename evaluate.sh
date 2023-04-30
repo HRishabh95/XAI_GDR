@@ -1,7 +1,7 @@
-docs=10
-SUMMARY="/tmp/pycharm_project_631/result/passage/wa_t3j_t3s_ner_biobert_simi_add_d50_j10.${docs}.summary"
+docs=20
+SUMMARY="/tmp/pycharm_project_631/result_abstract/40_60_biobert_simi_wa_d100_j10_trec_fields.${docs}.summary"
 printf "run\tqrels\tmeasure\ttopic\tscore\n" > $SUMMARY
-RUN_FILE_PATH="/tmp/pycharm_project_631/result/passage/wa_t3j_t3s_ner_biobert_simi_add_d50_j10.csv"
+RUN_FILE_PATH="/tmp/pycharm_project_631/result_abstract/40_60_biobert_simi_wa_d100_j10_trec_fields.csv"
 
 QRELS="/tmp/pycharm_project_631/qrels"
 trec_eval='/home/ubuntu/rupadhyay/Trec_eval_extension/'
